@@ -6,11 +6,14 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "traps.h"
+#include "ptable.h"
 
-struct {
+// we use ptable structure many time so declare at "ptable.h" apart
+/*struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-} ptable;
+} ptable;*/
 
 static struct proc *initproc;
 
@@ -19,6 +22,91 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+// part of orininal scheduler that change context
+// we declare it apart to use when i want
+void
+ChangeContext(struct cpu* c, struct proc* p) {
+	c->proc = p;
+	switchuvm(p);
+	p->state = RUNNING;
+
+	swtch(&(c->scheduler), p->context);
+	switchkvm();
+
+	c->proc = 0;
+}
+
+// push_queue push the proc to the queue of MLFQ
+// search empty space from the head, and push
+void
+push_queue(struct proc* p, int lev) {
+ 	
+ 	int mlfq_time_quantum[3] = {1, 2, 4};		// time quantum at every level
+
+	for(int i = 0; i < NPROC; i++){
+		if(ptable.mlfq[lev][i] == 0) {
+			p->q_lev = lev;						// change proc information where proc exist in queue
+			p->q_index = i;
+			p->time_allotment = 0;				// initialize the variable that check ticks for each level of queue
+			p->sh = mlfq_time_quantum[lev];		// to MLFQ, share means time quantum
+			ptable.mlfq[lev][i] = p;			// push!
+			break;
+		}
+	}
+}
+
+// pop_queue pop the proc from the queue
+void
+pop_queue(struct proc* p) {
+	ptable.mlfq[p->q_lev][p->q_index] = 0;
+	p->q_lev = 0;
+	p->q_index = 0;
+}
+
+// to supervise all proc of stride
+// we also use queue system only for stride
+// it will be searched first of all.
+void
+push_stride(struct proc* p) {
+	for(int i=0; i < NPROC; i++) {
+		if(ptable.stride[i] == 0) {
+			ptable.isNewStride = 1;					// information that new proc come in to stride scheduler			
+			p->q_lev = 0;
+			p->q_index = i;
+			p->isStride = 1;						// isStride is the information whether process is stride
+			ptable.stride[i] = p;
+			return;
+		}
+	}
+	cprintf("no more process become stride!\n");
+}
+
+// pop the process from the stride scheduler
+void
+pop_stride(struct proc* p) {
+	ptable.stride[p->q_index] = 0;
+	p->q_index = 0;
+	p->isStride = 0;
+}
+
+// check that the queue of given level is empty
+// if it is not empty,  we usually need to schedule that level again
+// we can see how use this function at scheduler(void)
+int
+isQueueEmpty(int lev) {
+	int index;
+	struct proc* p;
+	for(index = 0; index < NPROC; index++) {
+		if(ptable.mlfq[lev][index] != 0) {		// check the queue of level given empty
+			p = ptable.mlfq[lev][index];		
+			if((p->state == RUNNABLE) || (p->state == RUNNING)) {
+				if(p->sh > 0) return 1;			// if proc's share is lower than 0 we don't need to run that proc
+			}
+		}
+	}
+	return 0;
+}
 
 void
 pinit(void)
@@ -111,7 +199,14 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-
+  // initialize proc's tick information and sh
+  // first allocation, push to the MLFQ first that level 0, highest priority
+  p->rtick = 0;
+  p->sh = 0;
+  acquire(&ptable.lock);
+  push_queue(p, 0);
+  ptable.isNewbieComing = 1;	// this information ensure process to run first of all
+  release(&ptable.lock);
   return p;
 }
 
@@ -248,10 +343,16 @@ exit(void)
   curproc->cwd = 0;
 
   acquire(&ptable.lock);
+  // initialize the queue that process has occupied
+  if(curproc->isStride != 0) {
+   	total_share -= curproc->sh;
+	pop_stride(curproc);
+  }
+  else
+   	pop_queue(curproc);
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
-
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
@@ -325,33 +426,97 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+  int lev = 0;										// mlfq lev(lower number, higher priority)
+  int qhead = 0;									// index for searching every queue
+  int mlfq_time_allotment[3] = {5, 10, 100};		// time allotment at each level of queue
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+schedule:
+	// stride scheduling start first to ensure their share
+	for(qhead = 0; qhead < NPROC; qhead++) {
+		if(ptable.stride[qhead] != 0) {						// check whether stride queue is empty
+			p = ptable.stride[qhead];
+			if(p->state != RUNNABLE) continue;
+			if(p->rtick_for_boost >= p->sh) continue;		// if proc use up their share, pass over.
+			ChangeContext(c,p);						// ChangeContext change scheduler context
+		}											// to new proc context that we choose
+	}
+	// mlfq scheduling start
+	for(lev = 0; lev < 3; lev++){
+		for(qhead=0; qhead < NPROC; qhead++) {
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+			// if new process come(mlfq), we restart loop
+		 	// to execute the new process(level 0)
+		 	if(ptable.isNewbieComing != 0) {
+				ptable.isNewbieComing = 0;
+				lev = -1;
+				qhead = -1;
+				continue;
+			}
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+			// if process use set_cpu_share, process change to stride
+			// and we need to run stride first, so go to stride
+			if(ptable.isNewStride != 0) {
+				ptable.isNewStride = 0;
+				goto schedule;
+			}
+			// search queue of MLFQ to find proc that can execute
+		 	if(ptable.mlfq[lev][qhead] != 0) {
+			 	p = ptable.mlfq[lev][qhead];
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
+				if(p->state != RUNNABLE) continue;
 
+				// priority down (lev change)
+				if(((p->time_allotment) >= mlfq_time_allotment[lev]) && (lev<2)) {
+				 	
+				 	// pop p from present level queue
+				 	pop_queue(p);
+					// push p to lower priority queue
+					push_queue(p,lev+1);
+
+					// If we search a queue all over, check whether that queue is empty
+					// Not empty, we should run that proc first before lower the lev to ensure priority
+					if((qhead == (NPROC-1)) && isQueueEmpty(lev)) {
+						qhead = -1;
+					}
+					continue;
+				}
+				// no new proc, no stride, no priority down, then change context to that proc
+				ChangeContext(c,p);
+			}
+			// check that the queue is empty at every end of queue
+			if((qhead == (NPROC -1)) && isQueueEmpty(lev)) {
+				qhead = -1;
+			}
+			
+	
+	// this is the original part of scheduler
+	// I declare ChangeContext , to use this every time i want
+
+	/*
+	// Switch to chosen process.  It is the process's job
+	// to release ptable.lock and then reacquire it
+	// before jumping back to us.
+	c->proc = p;
+	switchuvm(p);
+	p->state = RUNNING;
+	  
+	// Count each process's tick and total tick.
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;*/
+		}
+	}
+	release(&ptable.lock);
   }
 }
 
@@ -483,8 +648,8 @@ kill(int pid)
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == pid){
-      p->killed = 1;
+    if(p->pid == pid){ 
+	  p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
@@ -536,8 +701,48 @@ procdump(void)
 int
 set_cpu_share(int share)
 {
-  struct proc* p;
-  p = myproc();
-  p.sh = share;
+  struct proc* p;					// There are something problems that set_cpu_share is called twice
+    								// when process call syscall set_cpu_share.
+  p = myproc();						// Each time total share added, the check of total share is not correctly working.
+
+  if(!p->isStride) {					// This 'if' condition check whether it is first call. We need only one check 
+										// for one process.
+
+	if(share > (80-total_share)) {					// If total share over 80%, we kill the last process to prevent unfairness.
+	  cprintf("!!!process over the limit share!!!\n");
+	  kill(p->pid);
+	  return -1;
+	}
+    total_share += share;
+	//cprintf("total share %d  set share %d\n",total_share, share);
+	p->sh = share;
+	pop_queue(p);
+	push_stride(p);
+  }
+  else {											// if the proc already stride, and want to change their share midstream
+	total_share -= p->sh;							// subtract proc's original share from total share and add new share
+
+   	if(share > (80-total_share)) {
+		cprintf("!!!process over the limit share!!!\n");
+		total_share += p->sh;						// it will be reduced at the exit();
+		kill(p->pid);
+		return -1;
+	}							
+	total_share += share;
+	p->sh = share;									// it is already in the stride scheduler, so we don't need to push.
+  }
   return 0;
+}
+
+int
+alarm(char *proc_name) {						// it is the syscall used when i test my scheduler working
+ 	int i = 0;									// it gives to process name (proc->name[])
+	struct proc* p;
+	p = myproc();
+	for(;i < 15; i++) {
+		p->name[i] = proc_name[i];
+	}
+	/*cprintf("proc name is %s\n",proc_name);
+	cprintf("myrpoc name is %s\n",p->name);*/
+	return 0;
 }

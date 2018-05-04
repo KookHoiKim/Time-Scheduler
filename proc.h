@@ -49,12 +49,20 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  int rtick = 0;			   // total tics process runs in one cycle.
-  int sh = 5;				   // cpu share of process, default is 5.
+  int rtick;			   	   // tick for check whether we should call yield
+  int sh;				  	   // cpu share of process, MLFQ is time allotment at each level
+  int q_lev;				   // level of MLFQ of process
+  int q_index;				   // index of queue both MLFQ and Stride
+  int isStride;				   // if 1, this proc is stride
+  int time_allotment;		   // ticks for check whether we should drop the priority for mlfq
+  int rtick_for_boost;		   // total tick proc run in one boosting cycle
 };
+
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+int total_share;

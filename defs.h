@@ -120,6 +120,10 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void			push_queue(struct proc* p, int lev);
+void			pop_queue(struct proc* p);
+void			push_stride(struct proc* p);
+void			pop_stride(struct proc* p);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -185,9 +189,12 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
-//prac_syscall.c
+// prac_syscall.c
 int				printk_str(char*);
 int				getppid(void);
+// proj2 scheduler
 int				set_cpu_share(int);
+int				alarm(char *proc_name);
+int				getlev(void);
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

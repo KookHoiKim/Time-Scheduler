@@ -26,6 +26,9 @@ int uptime(void);
 int myfunction(char*);
 int getppid(void);
 int set_cpu_share(int);
+int alarm(char*);
+int yield(void);
+int getlev(void);
 
 // ulib.c
 int stat(char*, struct stat*);

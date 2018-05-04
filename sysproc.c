@@ -93,11 +93,41 @@ sys_uptime(void)
   return xticks;
 }
 
+// syscall for set_cpu_share
 int
 sys_set_cpu_share(void)
 {
   int share;
-  if (argstr(0, &share) < 0)
+  if (argint(0, &share) < 0)
     return -1;
+
   return set_cpu_share(share);
+}
+
+int
+sys_alarm(void)
+{
+  //int i=0;
+  char* proc_name;
+  
+  if(argptr(1,(char**)&proc_name, 1) < 0)
+    return -1;
+	
+ // cprintf("%d\n",proc_name);
+  return alarm(proc_name);
+}
+
+// syscall yield
+int
+sys_yield(void)
+{
+  yield();
+  return 0;
+}
+
+// syscall that return the process's present level of queue.
+int
+sys_getlev(void)
+{
+	return myproc()->q_lev;
 }
