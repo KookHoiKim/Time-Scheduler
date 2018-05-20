@@ -1,3 +1,5 @@
+#include "spinlock.h"
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -36,7 +38,7 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
 struct proc {
-  uint sz;                     // Size of process memory (bytes)
+  uint *sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
@@ -56,6 +58,8 @@ struct proc {
   int isStride;				   // if 1, this proc is stride
   int time_allotment;		   // ticks for check whether we should drop the priority for mlfq
   int rtick_for_boost;		   // total tick proc run in one boosting cycle
+
+  struct spinlock sz_lock;
 };
 
 
