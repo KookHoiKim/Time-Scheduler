@@ -53,7 +53,7 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
+  addr = *(myproc()->sz);
   if(growproc(n) < 0)
     return -1;
   return addr;
@@ -131,3 +131,38 @@ sys_getlev(void)
 {
 	return myproc()->q_lev;
 }
+
+// syscall that create thread
+int
+sys_thread_create(void) 
+{
+	thread_t * thread;
+	void * start_routine;
+	void* arg; 
+	if(argptr(1,(char**)&thread,1) < 0) return -1;
+	if(argptr(1,(char**)&start_routine, 1) < 0) return -1;
+	if(argptr(1,(char**)&arg, 1) < 0)	return -1;
+	return thread_create(thread, start_routine, arg);
+}
+
+// syscall that wait until the thread end
+int
+sys_thread_join(void)
+{
+	thread_t * thread;
+	void* retval;
+	if(argptr(1,(char**)&thread,1) < 0)	return -1;
+	if(argptr(1,(char**)&retval, 1) < 0) return -1;
+	return thread_join(thread, &retval);
+}
+
+// syscall that exit thread
+int
+sys_thread_exit(void)
+{
+	void* retval;
+	if(argptr(1,(char**)&retval, 1) < 0) return -1;
+	thread_exit(retval);
+	return 0; // not reached
+}
+

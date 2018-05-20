@@ -18,6 +18,7 @@
 static struct proc *initproc;
 
 int nextpid = 1;
+int next_tid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -72,6 +73,7 @@ push_stride(struct proc* p) {
 	for(int i=0; i < NPROC; i++) {
 		if(ptable.stride[i] == 0) {
 			ptable.isNewStride = 1;					// information that new proc come in to stride scheduler			
+			ptable.isNewbieComing = 0;
 			p->q_lev = 0;
 			p->q_index = i;
 			p->isStride = 1;						// isStride is the information whether process is stride
@@ -176,6 +178,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tid = next_tid++;
 
   release(&ptable.lock);
 
@@ -185,7 +188,7 @@ found:
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
-
+  cprintf("allocproc is progressing~\n");
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
@@ -199,6 +202,8 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+
+  p->num_thread = 0;
   // initialize proc's tick information and sh
   // first allocation, push to the MLFQ first that level 0, highest priority
   p->rtick = 0;
@@ -224,7 +229,13 @@ userinit(void)
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  p->sz = PGSIZE;
+  
+  cprintf("userinit is progressing\n");
+//  p->sz = (uint*)malloc(sizeof(uint));
+  if((p->sz = (uint *)kalloc())==0)
+    panic("proc sz memory allocation fail");
+  *(p->sz) = PGSIZE;
+  cprintf("userinit : pid is %d, proc sz is %d\n",p->pid, *p->sz);
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -256,7 +267,7 @@ growproc(int n)
   uint sz;
   struct proc *curproc = myproc();
 
-  sz = curproc->sz;
+  sz = *(curproc->sz);
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
@@ -264,7 +275,7 @@ growproc(int n)
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
-  curproc->sz = sz;
+  *(curproc->sz) = sz;
   switchuvm(curproc);
   return 0;
 }
@@ -276,6 +287,7 @@ int
 fork(void)
 {
   int i, pid;
+  uint sz;
   struct proc *np;
   struct proc *curproc = myproc();
 
@@ -283,15 +295,18 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
+  sz = *(curproc->sz);
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+  cprintf("fork is progressing~\ncurrent proc's sz is %d\n",sz);
+  cprintf("current proc's pid is %d\n",curproc->pid);
+  if((np->pgdir = copyuvm(curproc->pgdir, sz)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-  np->sz = curproc->sz;
+  np->sz = (uint *)kalloc();
+  *(np->sz) = *(curproc->sz);
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
@@ -350,6 +365,7 @@ exit(void)
   }
   else
    	pop_queue(curproc);
+  kfree((char*)curproc->sz);
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
@@ -746,3 +762,201 @@ alarm(char *proc_name) {						// it is the syscall used when i test my scheduler
 	cprintf("myrpoc name is %s\n",p->name);*/
 	return 0;
 }
+
+int
+thread_create(thread_t* thread, void* (*start_routine)(void*), void* arg)
+{
+	int i;
+	int origin_sh = 0;
+	char *sp;
+ 	struct proc* curproc = myproc();
+	struct proc* np;
+	struct proc* p;
+	void* stack = kalloc();
+//	when allocproc, we call kalloc() for new thread's kstack
+//	then why we need ustack ? 
+//	do we just alloc in user mode for user stack and change the proc's stack pointer?
+
+	if((np=allocproc()) == 0) return -1;
+	np->pid = --nextpid;
+	*thread = np->tid;
+		
+	np->pgdir = curproc->pgdir;
+	np->sz = curproc->sz;
+	*(np->tf) = *(curproc->tf);
+	np->ustack = stack;
+	np->parent = curproc;
+	np->parent->num_thread ++;
+
+	np->tf->eax = 0;
+
+	sp = stack+PGSIZE -sizeof(uint);
+	*(uint *)sp = (uint)arg;
+
+	sp -= sizeof(uint);
+	*(uint*)sp = 0xffffffff;
+	np->tf->esp = (uint)sp;
+	np->tf->eip = (uint*)(start_routine);
+
+	for(i = 0; i < NOFILE; i++)
+		if(curproc->ofile[i])
+			np->ofile[i] = filedup(curproc->ofile[i]);
+	np->cwd = idup(curproc->cwd);
+
+	safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+	
+	// Scheduling part	
+
+	// if main thread is stride
+	// we need to devide the share
+	if(curproc->isStride) {
+	 	acquire(&ptable.lock);
+		if(np->parent->num_thread > 1) {
+			for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+				if(p->parent == curproc){
+					origin_sh = (p->sh)*(curproc->num_thread-1) + curproc->sh;
+					p->sh = origin_sh/(curproc->num_thread);
+				}
+			}
+			np->sh = origin_sh/(curproc->num_thread);
+			curproc->sh = np->sh + origin_sh%2;
+			np->state = RUNNABLE;
+			release(&ptable.lock);
+		}
+		else{
+			np->sh = (curproc->sh)/2;
+			curproc->sh = np->sh + (curproc->sh)%2;
+			np->state = RUNNABLE;
+			release(&ptable.lock);
+		}
+		pop_queue(np);
+		push_stride(np);
+		return 0;
+	}
+	
+	// if main thread is mlfq, we just run it
+	// by allocproc(), already thread is in the mlfq.
+	acquire(&ptable.lock);
+	
+	np->state = RUNNABLE;
+	
+	release(&ptable.lock);
+	
+	return 0;
+}
+
+int
+thread_join(thread_t* thread, void** retval)
+{
+	struct proc *p;
+	int havekids;
+//	int tid;
+	struct proc *curproc = myproc();
+
+	acquire(&ptable.lock);
+	for(;;){
+	// Scan through table looking for exited children.
+		havekids = 0;
+		for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		  if(p->tid != *thread)
+			continue;
+		  havekids = 1;
+		  if(p->state == ZOMBIE){
+			// Found one.
+//			tid = p->tid;
+			kfree(p->kstack);
+			p->kstack = 0;
+			p->ustack = 0;
+			//freevm(p->pgdir);
+			p->pgdir = 0;
+			p->sz = 0;
+			p->pid = 0;
+			p->tid = 0;
+			p->parent->num_thread --;
+			p->parent->sh += p->sh;
+			p->sh = 0;
+			if(p->isStride)
+				pop_stride(p);
+			else
+				pop_queue(p);
+			p->parent = 0;
+			p->name[0] = 0;
+			p->killed = 0;
+			p->state = UNUSED;
+			release(&ptable.lock);
+			return 0;
+		  }
+		}
+		if(!havekids || curproc->killed) {
+			release(&ptable.lock);
+			return -1;
+		}
+
+		sleep(curproc, &ptable.lock);
+	}
+
+}
+
+void
+thread_exit(void *retval)
+/*{
+	struct proc *curproc = myproc();
+	struct proc *p;
+	int fd;
+	
+	free(curproc->ustack);
+}*/
+{
+  struct proc *curproc = myproc();
+  struct proc *p;
+  int fd;
+
+  if(curproc == initproc)
+    panic("init exiting");
+
+  // Close all open files.
+  for(fd = 0; fd < NOFILE; fd++){
+    if(curproc->ofile[fd]){
+      fileclose(curproc->ofile[fd]);
+      curproc->ofile[fd] = 0;
+    }
+  }
+
+  begin_op();
+  iput(curproc->cwd);
+  end_op();
+  curproc->cwd = 0;
+
+  acquire(&ptable.lock);
+  // initialize the queue that process has occupied
+  if(curproc->isStride != 0) {
+   	total_share -= curproc->sh;
+	pop_stride(curproc);
+  }
+  else
+   	pop_queue(curproc);
+
+  // maybe we don't need free the sz of proc?
+  // we just copy the address of main thread's 
+  // so we just initialize it to zero?
+  // that work is done in join();
+
+//  kfree((char *)curproc->sz);
+
+  // Parent might be sleeping in wait().
+  wakeup1(curproc->parent);
+  // Pass abandoned children to init.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == curproc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+
+  // Jump into the scheduler, never to return.
+  curproc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+}
+

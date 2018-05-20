@@ -19,7 +19,7 @@ fetchint(uint addr, int *ip)
 {
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz || addr+4 > curproc->sz)
+  if(addr >= *(curproc->sz) || addr+4 > *(curproc->sz))
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -34,10 +34,10 @@ fetchstr(uint addr, char **pp)
   char *s, *ep;
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz)
+  if(addr >= *(curproc->sz))
     return -1;
   *pp = (char*)addr;
-  ep = (char*)curproc->sz;
+  ep = (char*)((*curproc->sz));  
   for(s = *pp; s < ep; s++){
     if(*s == 0)
       return s - *pp;
@@ -63,7 +63,7 @@ argptr(int n, char **pp, int size)
  
   if(argint(n, &i) < 0)
     return -1;
-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
+  if(size < 0 || (uint)i >= *(curproc->sz) || (uint)i+size > *(curproc->sz))
     return -1;
   *pp = (char*)i;
   return 0;
@@ -109,6 +109,9 @@ extern int sys_set_cpu_share(void);
 extern int sys_alarm(void);
 extern int sys_yield(void);
 extern int sys_getlev(void);
+extern int sys_thread_create(void);
+extern int sys_thread_join(void);
+extern int sys_thread_exit(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -138,6 +141,9 @@ static int (*syscalls[])(void) = {
 [SYS_alarm]			sys_alarm,
 [SYS_yield]			sys_yield,
 [SYS_getlev]		sys_getlev,
+[SYS_thread_create]	sys_thread_create,
+[SYS_thread_join]	sys_thread_join,
+[SYS_thread_exit]	sys_thread_exit,
 };
 
 void
