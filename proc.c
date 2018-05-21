@@ -219,6 +219,9 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
   struct proc *np;
   struct proc *curproc = myproc();
   uint sp, argc, ustack[3+MAXARG+1];
+  uint *sz;
+
+  uint params = *(uint*)arg;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -238,19 +241,45 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
   // TODO : Setting Stack for Function
   // Push argument strings, prepare rest of stack in ustack.
   
-  if(growproc(2*PGSIZE) == -1)
-	  goto bad;
+  //if(growproc(2*PGSIZE) == -1){
+//	  panic("on growproc");
+//	  goto bad;
+//  }
 
-  sp = *(curproc->sz);
+
+  np->pgdir = curproc->pgdir;
+
+  // Allocate two pages at the next page boundary.
+  // Make the first inaccessible.  Use the second as the user stack.
+  sz = np->sz;
+  *sz = PGROUNDUP(*sz);
+  if((*sz = allocuvm(np->pgdir, *sz, *sz + 2*PGSIZE)) == 0)
+    goto bad;
+  clearpteu(np->pgdir, (char*)(*sz - 2*PGSIZE));
+  sp = *sz;
+
+ // sp = *(curproc->sz);
   
-  for(argc = 0; &((int*)arg)[argc]; argc++) {
-    if(argc >= MAXARG)
-      goto bad;
-    sp = (sp - (strlen(&((char*)arg)[argc]) + 1)) & ~3;
-    if(copyout(np->pgdir, sp, &((int*)arg)[argc], strlen(&((char*)arg)[argc]) + 1) < 0)
-      goto bad;
-    ustack[3+argc] = sp;
+  //for(argc = 0; &((int*)arg)[argc]; argc++) {
+  //  if(argc >= MAXARG)
+  //    goto bad;
+  //  sp = (sp - (strlen(&((char*)arg)[argc]) + 1)) & ~3;
+  //  if(copyout(np->pgdir, sp, &((int*)arg)[argc], strlen(&((char*)arg)[argc]) + 1) < 0){
+  //	  panic("oncopyout 1");
+  //  goto bad;
+	//}
+      
+  //  ustack[3+argc] = sp;
+  //}
+
+  argc = 1; 
+  sp = (sp - (strlen((char*)&params)+1)) & ~3;
+  if(copyout(np->pgdir, sp, &params, strlen((char*)&params) + 1) < 0) {
+  	panic("oncopyout 1");
+    goto bad;
   }
+
+
   ustack[3+argc] = 0;
 
   ustack[0] = 0xffffffff;  // fake return PC
@@ -258,8 +287,10 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
   ustack[2] = sp - (argc+1)*4;  // argv pointer
 
   sp -= (3+argc+1) * 4;
-  if(copyout(np->pgdir, sp, ustack, (3+argc+1)*4) < 0)
+  if(copyout(np->pgdir, sp, ustack, (3+argc+1)*4) < 0){
+    panic("oncopyout 2");
     goto bad;
+  }
 
   np->tf->esp = sp;
   ///////////////////////////
