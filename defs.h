@@ -124,6 +124,11 @@ void			push_queue(struct proc* p, int lev);
 void			pop_queue(struct proc* p);
 void			push_stride(struct proc* p);
 void			pop_stride(struct proc* p);
+int             thread_create(thread_t *, void *(*)(void *), void *);
+void            thread_exit(void *);
+int             thread_join(thread_t, void **);
+
+     
 
 // swtch.S
 void            swtch(struct context**, struct context*);

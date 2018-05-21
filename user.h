@@ -29,6 +29,10 @@ int set_cpu_share(int);
 int alarm(char*);
 int yield(void);
 int getlev(void);
+int thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg);
+void thread_exit(void *retval);
+int thread_join(thread_t thread, void **retval);
+
 
 // ulib.c
 int stat(char*, struct stat*);

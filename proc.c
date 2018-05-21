@@ -210,8 +210,93 @@ found:
   return p;
 }
 
+// TODO : Make arg type to void* 
+// Make it char** to test naive threading
+int
+thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
+{
+  int i;
+  struct proc *np;
+  struct proc *curproc = myproc();
+  uint sp, argc, ustack[3+MAXARG+1];
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  *thread = nextpid;
+
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  // Set Function on Thread
+  // TODO : Setting Stack for Function
+  // Push argument strings, prepare rest of stack in ustack.
+  
+  if(growproc(2*PGSIZE) == -1)
+	  goto bad;
+
+  sp = *(curproc->sz);
+  
+  for(argc = 0; &((int*)arg)[argc]; argc++) {
+    if(argc >= MAXARG)
+      goto bad;
+    sp = (sp - (strlen(&((char*)arg)[argc]) + 1)) & ~3;
+    if(copyout(np->pgdir, sp, &((int*)arg)[argc], strlen(&((char*)arg)[argc]) + 1) < 0)
+      goto bad;
+    ustack[3+argc] = sp;
+  }
+  ustack[3+argc] = 0;
+
+  ustack[0] = 0xffffffff;  // fake return PC
+  ustack[1] = argc;
+  ustack[2] = sp - (argc+1)*4;  // argv pointer
+
+  sp -= (3+argc+1) * 4;
+  if(copyout(np->pgdir, sp, ustack, (3+argc+1)*4) < 0)
+    goto bad;
+
+  np->tf->esp = sp;
+  ///////////////////////////
+  np->tf->eip = (uint)start_routine;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return 0;
+
+bad: 
+  // TODO : Demalloc Resources
+  panic("bad state on thread_create");
+  return -1;
+	
+}
+
+// TODO : Implement
+void
+thread_exit(void* retval);
+
+// TODO : Implement
+int
+thread_join(thread_t thread, void **retval);
+
 //PAGEBREAK: 32
-// Set up first user process.
+// Set st user process.
 void
 userinit(void)
 {

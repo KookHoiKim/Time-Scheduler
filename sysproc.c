@@ -14,6 +14,20 @@ sys_fork(void)
 }
 
 int
+sys_thread_create(void)
+{
+	thread_t * thread = 0;
+	void* (*start_routine)(void*);
+	void* arg;
+
+	argptr(1, (char**)thread, 1);
+	argptr(2,(char**)&start_routine, 1);
+	argptr(3, (char**)&arg, 1);
+
+	return thread_create(thread, start_routine, arg);
+}
+
+int
 sys_exit(void)
 {
   exit();
@@ -53,7 +67,7 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
-  addr = *(myproc()->sz));
+  addr = *(myproc()->sz);
   if(growproc(n) < 0)
     return -1;
   return addr;

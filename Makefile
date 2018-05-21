@@ -179,6 +179,7 @@ UPROGS=\
 	_test_master\
 	_test_mlfq\
 	_test_stride\
+	_threadtest\
 
 fs.img: mkfs README $(UPROGS)
 		./mkfs fs.img README $(UPROGS)
