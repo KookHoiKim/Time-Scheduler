@@ -18,7 +18,6 @@
 static struct proc *initproc;
 
 int nextpid = 1;
-int next_tid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -179,7 +178,6 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->tid = next_tid++;
 
   release(&ptable.lock);
 
@@ -296,7 +294,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-  sz = *curproc->sz;
+  sz = curproc->usz;
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, sz)) == 0){
     kfree(np->kstack);
@@ -305,6 +303,7 @@ fork(void)
     return -1;
   }
   np->sz = (uint*)kalloc();
+  np->usz = curproc->usz;
   *np->sz = *curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -366,15 +365,29 @@ exit(void)
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
-  // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
-    }
-  }
 
+  // if main thread call exit before child thread exit
+  if(curproc->num_thread) {
+  	for(p = ptable.proc; p< &ptable.proc[NPROC]; p++) {
+		if(p->parent == curproc)
+		 	p->killed = 1;
+	}
+  }
+// if exit called by child thread
+  else if(curproc->isThread){
+  	if(curproc->parent)
+	 	curproc->parent->killed = 1;
+  }
+// Pass abandoned children to init.
+  else{
+  	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+   		if(p->parent == curproc){
+      		p->parent = initproc;
+      		if(p->state == ZOMBIE)
+        		wakeup1(initproc);
+    	}
+  	}
+  }
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
@@ -403,6 +416,7 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
 		p->sz = 0;
+		p->usz = 0;
         p->kstack = 0;
         freevm(p->pgdir);
         p->pid = 0;
@@ -775,13 +789,13 @@ thread_create(thread_t* thread, void* (*start_routine)(void*), void* arg)
 //	then why we need ustack ? 
 //	do we just alloc in user mode for user stack and change the proc's stack pointer?
 	if((np=allocproc()) == 0) return -1;
-	np->pid = --nextpid;
+	curproc->num_thread ++;
+	np->tid = curproc->num_thread;
 	*thread = np->tid;
 	np->pgdir = curproc->pgdir;
 	np->sz = curproc->sz;
 	*(np->tf) = *(curproc->tf);
 	np->parent = curproc;
-	curproc->num_thread ++;
 //	cprintf("curproc has %d thread\n",curproc->num_thread);
 
 //	thread already use main thread's memory
@@ -794,14 +808,15 @@ thread_create(thread_t* thread, void* (*start_routine)(void*), void* arg)
 //		cprintf("fuck error first\n");
 //		goto bad;
 //	}
-	sz = *curproc->sz;
-	if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0)
+	sz = curproc->usz + 2*PGSIZE*(curproc->num_thread - 1);
+	sz = PGROUNDUP(sz);
+	if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0){
+	 	cprintf("over the page 4gb?\n");
 	 	goto bad;
-//	sz = PGROUNDUP(sz);
+	}
 //	clearpteu(np->pgdir, (char*)(sz - 2*PGSIZE));
 	sp = sz;
 	np->usz = sz;
-	*curproc->sz = sz;
 //	cprintf("sp is %d\n",sp);
 	
 	ustack[0] = 0xffffffff;  // fake return PC
@@ -893,23 +908,21 @@ thread_join(thread_t thread, void** retval)
 //			tid = p->tid;
 //		   cprintf("you did find zombie!\n");
 		   	*retval =(void*)p->result;
+			if(!deallocuvm(p->pgdir, p->usz, p->usz - 2*PGSIZE))
+				panic("dealloc fail!\n");
 			kfree(p->kstack);
 			p->kstack = 0;
 			//freevm(p->pgdir);
 			p->pgdir = 0;
 			p->sz = 0;
+			p->usz = 0;
 			p->pid = 0;
 			p->tid = 0;
-			p->parent->num_thread --;
+			curproc->num_thread --;
+			//if(curproc->num_thread == 0)
+			//	*(curproc->sz) = curproc->usz;
 			// thread return share to main thread when thread_exit
 			// things about scheduling already initialized in exit
-			//p->parent->sh += p->sh;
-			//p->sh = 0;
-
-			//if(p->isStride)
-			//	pop_stride(p);
-			//else
-			//	pop_queue(p);
 			p->parent = 0;
 			p->name[0] = 0;
 			p->killed = 0;
