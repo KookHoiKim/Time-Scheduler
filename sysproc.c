@@ -14,18 +14,8 @@ sys_fork(void)
 }
 
 int
-sys_thread_create(void)
+sys_clone(void)
 {
-//	thread_t * thread = 0;
-//	void* (*start_routine)(void*);
-//	void* arg;
-//	void* stack;
-
-//	argptr(1, (char**)thread, 1);
-//	argptr(2,(char**)&start_routine, 1);
-//	argptr(3, (char**)&arg, 1);
-//	argptr(4, (char**)&stack, 1);
-//
 	int n;
 	void *thread;
 	void *start_routine;
@@ -57,9 +47,7 @@ sys_thread_create(void)
 	}
 	stack = (void*) n;
 
-	return thread_create(thread, start_routine, arg, stack);
-
-
+	return clone(thread, start_routine, arg, stack);
 }
 
 int

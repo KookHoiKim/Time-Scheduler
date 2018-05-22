@@ -151,12 +151,9 @@ racingtest(void)
   int i;
   void *retval;
   gcnt = 0;
-
-  void *stack;
   
   for (i = 0; i < NUM_THREAD; i++){
-	stack = malloc(4096);
-    if (thread_create(&threads[i], racingthreadmain, (void*)i, stack) != 0){
+    if (thread_create(&threads[i], racingthreadmain, (void*)i) != 0){
       printf(1, "panic at thread_create\n");
       return -1;
     }

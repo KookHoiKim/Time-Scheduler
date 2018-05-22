@@ -109,7 +109,7 @@ extern int sys_set_cpu_share(void);
 extern int sys_alarm(void);
 extern int sys_yield(void);
 extern int sys_getlev(void);
-extern int sys_thread_create(void);
+extern int sys_clone(void);
 extern int sys_thread_exit(void);
 extern int sys_thread_join(void);
 
@@ -141,7 +141,7 @@ static int (*syscalls[])(void) = {
 [SYS_alarm]			sys_alarm,
 [SYS_yield]			sys_yield,
 [SYS_getlev]		sys_getlev,
-[SYS_thread_create] sys_thread_create,
+[SYS_clone]         sys_clone,
 [SYS_thread_exit]   sys_thread_exit,
 [SYS_thread_join]   sys_thread_join,
 };

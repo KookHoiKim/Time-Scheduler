@@ -213,16 +213,13 @@ found:
   return p;
 }
 
-// TODO : Make arg type to void* 
-// Make it char** to test naive threading
 int
-thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg, void* stack)
+clone(thread_t *thread, void *(*start_routine)(void *), void *arg, void* stack)
 {
   int i;
   struct proc *np;
   struct proc *curproc = myproc();
   uint ustack[3];
-  //uint sz;
   void* sp;
 
   // Allocate process.
@@ -241,20 +238,10 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg, void*
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
-  // Set Function on Thread
-  // TODO : Setting Stack for Function
-  // Push argument strings, prepare rest of stack in ustack.
-  
   np->pgdir = curproc->pgdir;
 
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
- 
-  //sz = PGROUNDUP(sz);
-  //if((sz = allocuvm(np->pgdir, sz, sz + (2*PGSIZE*(np->tid)))) == 0)
-  //  goto bad;
-  //clearpteu(np->pgdir, (char*)(sz - (2*PGSIZE*np->tid)));
-  //sp = sz;
 
   ustack[0] = 0xFFFFFFFF;
   ustack[1] = (uint)arg;
@@ -265,22 +252,8 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg, void*
   if(copyout(np->pgdir, (uint)sp, ustack, 8) < 0)
     goto bad;
 
-////  ustack[3] = (uint)sp;
-////  ustack[4] = 0;
-
-////  argc = 1;
-////  ustack[0] = 0xffffffff;  // fake return PC
-////  ustack[1] = argc;
-////  ustack[2] = (uint)sp - (argc+1)*4;
-////  sp -= (3+argc+1) * 4;
-////  if(copyout(np->pgdir, (uint)sp, ustack, (3+argc+1)*4) < 0){
-////    panic("oncopyout 2");
-////    goto bad;
-////  }
   np->tf->esp = (uint)sp;
-//////////////////
   np->tf->eip = (uint)start_routine;
- // np->sz = sz;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -293,11 +266,9 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg, void*
 
   release(&ptable.lock);
   cprintf("sex\n");
-//  switchuvm(np);
   return 0;
 
 bad: 
-  // TODO : Demalloc Resources
   panic("bad state on thread_create");
   return -1;
 	

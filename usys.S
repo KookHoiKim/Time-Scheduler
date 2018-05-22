@@ -35,6 +35,7 @@ SYSCALL(set_cpu_share)
 SYSCALL(alarm)
 SYSCALL(yield)
 SYSCALL(getlev)
-SYSCALL(thread_create)
+SYSCALL(clone)
 SYSCALL(thread_exit)
 SYSCALL(thread_join)
+
