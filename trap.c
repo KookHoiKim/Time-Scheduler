@@ -130,9 +130,9 @@ trap(struct trapframe *tf)
       panic("trap");
     }
     // In user space, assume process misbehaved.
-    cprintf("pid %d %s: trap %d err %d on cpu %d "
+    cprintf("pid %d %s tid %d: trap %d err %d on cpu %d "
             "eip 0x%x addr 0x%x--kill proc\n",
-            myproc()->pid, myproc()->name, tf->trapno,
+            myproc()->pid, myproc()->name, myproc()->tid, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
     myproc()->killed = 1;
   }
@@ -152,6 +152,7 @@ trap(struct trapframe *tf)
 	myproc()->time_allotment++;		// allotment check for MLFQ proc that should drop the priority
 	if(myproc()->rtick >= myproc()->sh) {
 		myproc()->rtick = 0;		// if yield, initialize rtick for the next
+//		cprintf("in trap.c, print just before yield %s\n",myproc()->name);
 		yield();
 	}						// detail description of variables is at wiki or declalation 
   }							// of struct proc

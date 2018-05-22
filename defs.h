@@ -196,5 +196,9 @@ int				getppid(void);
 int				set_cpu_share(int);
 int				alarm(char *proc_name);
 int				getlev(void);
+// proj3 multithread
+int				thread_create(thread_t* thread, void*(*start_routine)(void*), void* arg);
+int				thread_join(thread_t thread, void** retval);
+void			thread_exit(void* retval);
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

@@ -6,6 +6,8 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "spinlock.h"
+#include "ptable.h"
 
 int
 exec(char *path, char **argv)
@@ -63,8 +65,10 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
-    goto bad;
+  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0){
+  	cprintf("fuck error in exec\n"); 
+   	goto bad;
+  }
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
@@ -92,11 +96,25 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
+  
+  curproc->usz = sz;
+//  for(i = 1; i < 64; i++){
+//  	if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0){
+//			cprintf("63 stack firstly allocate error\n");
+//			goto bad;
+//		}
+//		clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+//  }
 
   // Commit to the user image.
+//  acquire(&ptable.lock);
+//  curproc->state = RUNNABLE;
+//  release(&ptable.lock);
+
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
-  curproc->sz = sz;
+  *curproc->sz = sz;
+
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
   switchuvm(curproc);
@@ -104,8 +122,10 @@ exec(char *path, char **argv)
   return 0;
 
  bad:
-  if(pgdir)
+  if(pgdir){
     freevm(pgdir);
+	cprintf("excute freevm pgdir??\n");
+  }
   if(ip){
     iunlockput(ip);
     end_op();
