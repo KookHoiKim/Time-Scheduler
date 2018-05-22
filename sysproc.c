@@ -167,19 +167,24 @@ sys_thread_create(void)
 int
 sys_thread_join(void)
 {
+ 	int n;
 	thread_t thread;
-	void* retval;
-	if(argint(0,(int*)&thread) < 0)	return -1;
-	if(argptr(1,(char**)&retval, 1) < 0) return -1;
-	return thread_join(thread, &retval);
+	void** retval;
+	if(argint(0, &n) < 0)	return -1;
+	thread = (thread_t) n;
+	if(argint(1, &n) < 0)	return -1;
+	retval = (void**) n;
+	return thread_join(thread, retval);
 }
 
 // syscall that exit thread
 int
 sys_thread_exit(void)
 {
-	void* retval;
-	if(argptr(1,(char**)&retval, 1) < 0) return -1;
+ 	int n;
+ 	void* retval;
+	if(argint(0,&n) < 0) return -1;
+	retval = (void*) n;
 	thread_exit(retval);
 	return 0; // not reached
 }
