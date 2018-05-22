@@ -132,11 +132,13 @@ racingthreadmain(void *arg)
   int tid = (int) arg;
   int i;
   int tmp;
+  printf(1, "thread %d on running", tid);
   for (i = 0; i < 10000000; i++){
     tmp = gcnt;
     tmp++;
     nop();
     gcnt = tmp;
+	printf(1, "thread : %d, i : %d", tid, i);
   }
   thread_exit((void *)(tid+1));
     exit();
@@ -149,13 +151,17 @@ racingtest(void)
   int i;
   void *retval;
   gcnt = 0;
+
+  void *stack;
   
   for (i = 0; i < NUM_THREAD; i++){
-    if (thread_create(&threads[i], racingthreadmain, (void*)i) != 0){
+	stack = malloc(4096);
+    if (thread_create(&threads[i], racingthreadmain, (void*)i, stack) != 0){
       printf(1, "panic at thread_create\n");
       return -1;
     }
   }
+  sleep(5000);
   for (i = 0; i < NUM_THREAD; i++){
     if (thread_join(threads[i], &retval) != 0 || (int)retval != i+1){
       printf(1, "panic at thread_join\n");

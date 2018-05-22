@@ -31,9 +31,10 @@ ChangeContext(struct cpu* c, struct proc* p) {
 	switchuvm(p);
 	p->state = RUNNING;
 
+	// Do Context Switching
 	swtch(&(c->scheduler), p->context);
-	switchkvm();
 
+	switchkvm();
 	c->proc = 0;
 }
 
@@ -176,6 +177,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tid = 0;
+  p->isThread = 0;
 
   release(&ptable.lock);
 
@@ -213,23 +216,24 @@ found:
 // TODO : Make arg type to void* 
 // Make it char** to test naive threading
 int
-thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
+thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg, void* stack)
 {
   int i;
   struct proc *np;
   struct proc *curproc = myproc();
-  uint sp, argc, ustack[3+MAXARG+1];
-  uint *sz;
-
-  uint params = *(uint*)arg;
+  uint ustack[3];
+  //uint sz;
+  void* sp;
 
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
   }
-
+ 
   *thread = nextpid;
+  curproc->tid++;
 
+  np->isThread = 1;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -241,74 +245,55 @@ thread_create(thread_t *thread, void *(*start_routine)(void *), void *arg)
   // TODO : Setting Stack for Function
   // Push argument strings, prepare rest of stack in ustack.
   
-  //if(growproc(2*PGSIZE) == -1){
-//	  panic("on growproc");
-//	  goto bad;
-//  }
-
-
   np->pgdir = curproc->pgdir;
 
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
-  sz = np->sz;
-  *sz = PGROUNDUP(*sz);
-  if((*sz = allocuvm(np->pgdir, *sz, *sz + 2*PGSIZE)) == 0)
-    goto bad;
-  clearpteu(np->pgdir, (char*)(*sz - 2*PGSIZE));
-  sp = *sz;
-
- // sp = *(curproc->sz);
-  
-  //for(argc = 0; &((int*)arg)[argc]; argc++) {
-  //  if(argc >= MAXARG)
-  //    goto bad;
-  //  sp = (sp - (strlen(&((char*)arg)[argc]) + 1)) & ~3;
-  //  if(copyout(np->pgdir, sp, &((int*)arg)[argc], strlen(&((char*)arg)[argc]) + 1) < 0){
-  //	  panic("oncopyout 1");
+ 
+  //sz = PGROUNDUP(sz);
+  //if((sz = allocuvm(np->pgdir, sz, sz + (2*PGSIZE*(np->tid)))) == 0)
   //  goto bad;
-	//}
-      
-  //  ustack[3+argc] = sp;
-  //}
+  //clearpteu(np->pgdir, (char*)(sz - (2*PGSIZE*np->tid)));
+  //sp = sz;
 
-  argc = 1; 
-  sp = (sp - (strlen((char*)&params)+1)) & ~3;
-  if(copyout(np->pgdir, sp, &params, strlen((char*)&params) + 1) < 0) {
-  	panic("oncopyout 1");
+  ustack[0] = 0xFFFFFFFF;
+  ustack[1] = (uint)arg;
+
+  sp = stack + PGSIZE;
+  sp -= 8;
+
+  if(copyout(np->pgdir, (uint)sp, ustack, 8) < 0)
     goto bad;
-  }
 
+////  ustack[3] = (uint)sp;
+////  ustack[4] = 0;
 
-  ustack[3+argc] = 0;
-
-  ustack[0] = 0xffffffff;  // fake return PC
-  ustack[1] = argc;
-  ustack[2] = sp - (argc+1)*4;  // argv pointer
-
-  sp -= (3+argc+1) * 4;
-  if(copyout(np->pgdir, sp, ustack, (3+argc+1)*4) < 0){
-    panic("oncopyout 2");
-    goto bad;
-  }
-
-  np->tf->esp = sp;
-  ///////////////////////////
+////  argc = 1;
+////  ustack[0] = 0xffffffff;  // fake return PC
+////  ustack[1] = argc;
+////  ustack[2] = (uint)sp - (argc+1)*4;
+////  sp -= (3+argc+1) * 4;
+////  if(copyout(np->pgdir, (uint)sp, ustack, (3+argc+1)*4) < 0){
+////    panic("oncopyout 2");
+////    goto bad;
+////  }
+  np->tf->esp = (uint)sp;
+//////////////////
   np->tf->eip = (uint)start_routine;
+ // np->sz = sz;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
-
-  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  safestrcpy(np->name, "thread", sizeof(curproc->name));
 
   acquire(&ptable.lock);
-
   np->state = RUNNABLE;
 
   release(&ptable.lock);
-
+  cprintf("sex\n");
+//  switchuvm(np);
   return 0;
 
 bad: 
@@ -340,8 +325,7 @@ userinit(void)
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  p->sz = (uint*) kalloc();
-  *(p->sz) = PGSIZE;
+  p->sz = PGSIZE;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -373,8 +357,8 @@ growproc(int n)
   uint sz;
   struct proc *curproc = myproc();
 
-  acquire(&(curproc->sz_lock));
-  sz = *(curproc->sz);
+  //acquire(&(curproc->sz_lock));
+  sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
@@ -382,8 +366,8 @@ growproc(int n)
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
-  *(curproc->sz) = sz;
-  release(&(curproc->sz_lock));
+  curproc->sz = sz;
+  //release(&(curproc->sz_lock));
 
   switchuvm(curproc);
   return 0;
@@ -405,14 +389,14 @@ fork(void)
   }
 
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, *(curproc->sz))) == 0){
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-  np->sz = (uint*) kalloc();
-  *(np->sz) = *(curproc->sz);
+  
+  np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
 

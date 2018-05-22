@@ -16,15 +16,62 @@ sys_fork(void)
 int
 sys_thread_create(void)
 {
-	thread_t * thread = 0;
-	void* (*start_routine)(void*);
-	void* arg;
+//	thread_t * thread = 0;
+//	void* (*start_routine)(void*);
+//	void* arg;
+//	void* stack;
 
-	argptr(1, (char**)thread, 1);
-	argptr(2,(char**)&start_routine, 1);
-	argptr(3, (char**)&arg, 1);
+//	argptr(1, (char**)thread, 1);
+//	argptr(2,(char**)&start_routine, 1);
+//	argptr(3, (char**)&arg, 1);
+//	argptr(4, (char**)&stack, 1);
+//
+	int n;
+	void *thread;
+	void *start_routine;
+	void *arg;
+	void *stack;
 
-	return thread_create(thread, start_routine, arg);
+	if(argint(0, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	thread = (void*) n;
+
+	if(argint(1, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	start_routine = (void*) n;
+
+
+	if(argint(2, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	arg = (void*) n;
+
+	if(argint(3, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	stack = (void*) n;
+
+	return thread_create(thread, start_routine, arg, stack);
+
+
+}
+
+int
+sys_thread_exit(void)
+{
+	return 0;
+}
+
+int 
+sys_thread_join(void)
+{
+	return 0;
 }
 
 int
@@ -67,7 +114,7 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
-  addr = *(myproc()->sz);
+  addr = myproc()->sz;
   if(growproc(n) < 0)
     return -1;
   return addr;

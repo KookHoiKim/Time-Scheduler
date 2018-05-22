@@ -500,7 +500,7 @@ a2	stressfs.asm	/^  a2:	50                   	push   %eax$/;"	l
 a2	test_master.asm	/^  a2:	5d                   	pop    %ebp$/;"	l
 a2	test_mlfq.asm	/^  a2:	ba e8 07 00 00       	mov    $0x7e8,%edx$/;"	l
 a2	test_sample.asm	/^  a2:	50                   	push   %eax$/;"	l
-a2	threadtest.asm	/^  a2:	e8 53 04 00 00       	call   4fa <wait>$/;"	l
+a2	threadtest.asm	/^  a2:	e8 83 04 00 00       	call   52a <wait>$/;"	l
 a2	zombie.asm	/^  a2:	29 d8                	sub    %ebx,%eax$/;"	l
 a21	sh.asm	/^     a21:	8b 5d fc             	mov    -0x4(%ebp),%ebx$/;"	l
 a22	usertests.asm	/^     a22:	83 c4 10             	add    $0x10,%esp$/;"	l
@@ -789,6 +789,7 @@ apicid	kernel.asm	/^  apicid = lapicid();$/;"	d
 apicid	mp.h	/^  uchar apicid;                 \/\/ local APIC id$/;"	m	struct:mpproc
 apicid	proc.h	/^  uchar apicid;                \/\/ Local APIC ID$/;"	m	struct:cpu
 apicno	mp.h	/^  uchar apicno;                 \/\/ I\/O APIC id$/;"	m	struct:mpioapic
+argc	kernel.asm	/^  argc = 1; $/;"	d
 argc	sh.asm	/^  argc = 0;$/;"	d
 argfd	sysfile.c	/^argfd(int n, int *pfd, struct file **pf)$/;"	f	file:
 argint	syscall.c	/^argint(int n, int *ip)$/;"	f
@@ -988,7 +989,7 @@ b8	rm.asm	/^  b8:	8b 4d 0c             	mov    0xc(%ebp),%ecx$/;"	l
 b8	stressfs.asm	/^  b8:	56                   	push   %esi$/;"	l
 b8	test_master.asm	/^  b8:	8b 4d 0c             	mov    0xc(%ebp),%ecx$/;"	l
 b8	test_mlfq.asm	/^  b8:	ff 75 dc             	pushl  -0x24(%ebp)$/;"	l
-b8	threadtest.asm	/^  b8:	ff 35 60 0d 00 00    	pushl  0xd60$/;"	l
+b8	threadtest.asm	/^  b8:	ff 35 bc 0d 00 00    	pushl  0xdbc$/;"	l
 b80	sh.asm	/^     b80:	c3                   	ret    $/;"	l
 b80	usertests.asm	/^     b80:	e8 ab 2e 00 00       	call   3a30 <printf>$/;"	l
 b81	sh.asm	/^     b81:	eb 0d                	jmp    b90 <memset>$/;"	l
@@ -1122,7 +1123,7 @@ be	init.asm	/^  be:	e8 fd 03 00 00       	call   4c0 <printf>$/;"	l
 be	mkdir.asm	/^  be:	0f b6 19             	movzbl (%ecx),%ebx$/;"	l
 be	rm.asm	/^  be:	0f b6 19             	movzbl (%ecx),%ebx$/;"	l
 be	test_master.asm	/^  be:	0f b6 19             	movzbl (%ecx),%ebx$/;"	l
-be	threadtest.asm	/^  be:	e8 47 04 00 00       	call   50a <read>$/;"	l
+be	threadtest.asm	/^  be:	e8 77 04 00 00       	call   53a <read>$/;"	l
 be	usertests.asm	/^      be:	e8 ad 0c 00 00       	call   d70 <mem>$/;"	l
 be0	sh.asm	/^     be0:	5b                   	pop    %ebx$/;"	l
 be1	sh.asm	/^     be1:	5d                   	pop    %ebp$/;"	l
@@ -1780,7 +1781,7 @@ d5	grep.asm	/^  d5:	85 c0                	test   %eax,%eax$/;"	l
 d5	kill.asm	/^  d5:	5e                   	pop    %esi$/;"	l
 d5	ln.asm	/^  d5:	5e                   	pop    %esi$/;"	l
 d5	my_userapp.asm	/^  d5:	90                   	nop$/;"	l
-d5	threadtest.asm	/^  d5:	ff 35 60 0d 00 00    	pushl  0xd60$/;"	l
+d5	threadtest.asm	/^  d5:	ff 35 bc 0d 00 00    	pushl  0xdbc$/;"	l
 d5	wc.asm	/^  d5:	83 c4 10             	add    $0x10,%esp$/;"	l
 d5	zombie.asm	/^  d5:	90                   	nop$/;"	l
 d50	usertests.asm	/^     d50:	6a 01                	push   $0x1$/;"	l
@@ -1913,7 +1914,7 @@ db	echo.asm	/^  db:	5d                   	pop    %ebp$/;"	l
 db	init.asm	/^  db:	68 e0 07 00 00       	push   $0x7e0$/;"	l
 db	mmu.h	/^  uint db : 1;         \/\/ 0 = 16-bit segment, 1 = 32-bit segment$/;"	m	struct:segdesc
 db	my_userapp.asm	/^  db:	90                   	nop$/;"	l
-db	threadtest.asm	/^  db:	e8 3a 04 00 00       	call   51a <close>$/;"	l
+db	threadtest.asm	/^  db:	e8 6a 04 00 00       	call   54a <close>$/;"	l
 db	wc.asm	/^  db:	89 45 e4             	mov    %eax,-0x1c(%ebp)$/;"	l
 db	zombie.asm	/^  db:	90                   	nop$/;"	l
 db1	sh.asm	/^     db1:	c3                   	ret    $/;"	l
@@ -2086,7 +2087,7 @@ e0	ln.asm	/^  e0:	55                   	push   %ebp$/;"	l
 e0	my_userapp.asm	/^  e0:	55                   	push   %ebp$/;"	l
 e0	test_sample.asm	/^  e0:	55                   	push   %ebp$/;"	l
 e0	test_stride.asm	/^  e0:	55                   	push   %ebp$/;"	l
-e0	threadtest.asm	/^  e0:	ff 34 9d 48 0d 00 00 	pushl  0xd48(,%ebx,4)$/;"	l
+e0	threadtest.asm	/^  e0:	ff 34 9d a4 0d 00 00 	pushl  0xda4(,%ebx,4)$/;"	l
 e0	wc.asm	/^  e0:	31 ff                	xor    %edi,%edi$/;"	l
 e0	zombie.asm	/^  e0:	55                   	push   %ebp$/;"	l
 e01	sh.asm	/^     e01:	c3                   	ret    $/;"	l
@@ -2244,7 +2245,7 @@ e8	init.asm	/^  e8:	e9 3c ff ff ff       	jmp    29 <main+0x29>$/;"	l
 e8	sh.asm	/^      e8:	e8 5d 0c 00 00       	call   d4a <close>$/;"	l
 e8	stressfs.asm	/^  e8:	50                   	push   %eax$/;"	l
 e8	test_stride.asm	/^  e8:	8b 4d 0c             	mov    0xc(%ebp),%ecx$/;"	l
-e8	threadtest.asm	/^  e8:	68 06 0a 00 00       	push   $0xa06$/;"	l
+e8	threadtest.asm	/^  e8:	68 5f 0a 00 00       	push   $0xa5f$/;"	l
 e8	wc.asm	/^  e8:	31 f6                	xor    %esi,%esi$/;"	l
 e81	sh.asm	/^     e81:	6a 01                	push   $0x1$/;"	l
 e82	usertests.asm	/^     e82:	bb e8 03 00 00       	mov    $0x3e8,%ebx$/;"	l
@@ -2398,7 +2399,7 @@ ef	init.asm	/^  ef:	90                   	nop$/;"	l
 ef	ls.asm	/^  ef:	5b                   	pop    %ebx$/;"	l
 ef	my_userapp.asm	/^  ef:	fc                   	cld    $/;"	l
 ef	test_mlfq.asm	/^  ef:	90                   	nop$/;"	l
-ef	threadtest.asm	/^  ef:	e8 8c 05 00 00       	call   680 <printf>$/;"	l
+ef	threadtest.asm	/^  ef:	e8 bc 05 00 00       	call   6b0 <printf>$/;"	l
 ef	zombie.asm	/^  ef:	fc                   	cld    $/;"	l
 ef0	sh.asm	/^     ef0:	83 ec 04             	sub    $0x4,%esp$/;"	l
 ef0	usertests.asm	/^     ef0:	57                   	push   %edi$/;"	l
@@ -2675,7 +2676,7 @@ f9	rm.asm	/^  f9:	8d b4 26 00 00 00 00 	lea    0x0(%esi,%eiz,1),%esi$/;"	l
 f9	stressfs.asm	/^  f9:	8d b4 26 00 00 00 00 	lea    0x0(%esi,%eiz,1),%esi$/;"	l
 f9	test_master.asm	/^  f9:	8d b4 26 00 00 00 00 	lea    0x0(%esi,%eiz,1),%esi$/;"	l
 f9	test_stride.asm	/^  f9:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi$/;"	l
-f9	threadtest.asm	/^  f9:	e8 84 04 00 00       	call   582 <sleep>$/;"	l
+f9	threadtest.asm	/^  f9:	e8 b4 04 00 00       	call   5b2 <sleep>$/;"	l
 f9	wc.asm	/^  f9:	31 c9                	xor    %ecx,%ecx$/;"	l
 f9	zombie.asm	/^  f9:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi$/;"	l
 f90	sh.asm	/^     f90:	83 ec 0c             	sub    $0xc,%esp$/;"	l
@@ -3058,6 +3059,7 @@ int	grep.asm	/^int matchstar(int c, char *re, char *text)$/;"	l
 int	grep.asm	/^int matchstar(int, char*, char*);$/;"	l
 int	grep.asm	/^int$/;"	l
 int	init.asm	/^int$/;"	l
+int	kernel.asm	/^int $/;"	l
 int	kernel.asm	/^int printk_str(char *str){$/;"	l
 int	kernel.asm	/^int sys_myfunction(void){$/;"	l
 int	kernel.asm	/^int$/;"	l
@@ -3798,9 +3800,9 @@ size	umalloc.c	/^    uint size;$/;"	m	struct:header::__anon2	file:
 skipelem	fs.c	/^skipelem(char *path, char *name)$/;"	f	file:
 sleep	proc.c	/^sleep(void *chan, struct spinlock *lk)$/;"	f
 sleeplock	sleeplock.h	/^struct sleeplock {$/;"	s
-sp	kernel.asm	/^    sp = (sp - (strlen(&((char*)arg)[argc]) + 1)) & ~3;$/;"	d
 sp	kernel.asm	/^    sp = (sp - (strlen(argv[argc]) + 1)) & ~3;$/;"	d
-sp	kernel.asm	/^  sp = *(curproc->sz);$/;"	d
+sp	kernel.asm	/^  sp = (sp - (strlen((char*)&params)+1)) & ~3;$/;"	d
+sp	kernel.asm	/^  sp = *sz;$/;"	d
 sp	kernel.asm	/^  sp = p->kstack + KSTACKSIZE;$/;"	d
 sp	kernel.asm	/^  sp = sz;$/;"	d
 specrev	mp.h	/^  uchar specrev;                \/\/ [14]$/;"	m	struct:mp
@@ -4067,6 +4069,8 @@ sys_sbrk	sysproc.c	/^sys_sbrk(void)$/;"	f
 sys_set_cpu_share	sysproc.c	/^sys_set_cpu_share(void)$/;"	f
 sys_sleep	sysproc.c	/^sys_sleep(void)$/;"	f
 sys_thread_create	sysproc.c	/^sys_thread_create(void)$/;"	f
+sys_thread_exit	sysproc.c	/^sys_thread_exit(void)$/;"	f
+sys_thread_join	sysproc.c	/^sys_thread_join(void)$/;"	f
 sys_unlink	sysfile.c	/^sys_unlink(void)$/;"	f
 sys_uptime	sysproc.c	/^sys_uptime(void)$/;"	f
 sys_wait	sysproc.c	/^sys_wait(void)$/;"	f
@@ -4077,6 +4081,7 @@ syscalls	syscall.c	/^static int (*syscalls[])(void) = {$/;"	v	file:
 sz	kernel.asm	/^  sz = *(curproc->sz);$/;"	d
 sz	kernel.asm	/^  sz = 0;$/;"	d
 sz	kernel.asm	/^  sz = PGROUNDUP(sz);$/;"	d
+sz	kernel.asm	/^  sz = np->sz;$/;"	d
 sz	proc.h	/^  uint *sz;                     \/\/ Size of process memory (bytes)$/;"	m	struct:proc
 sz_lock	proc.h	/^  struct spinlock sz_lock;$/;"	m	struct:proc	typeref:struct:proc::spinlock
 t	mmu.h	/^  ushort t;          \/\/ Trap on task switch$/;"	m	struct:taskstate
