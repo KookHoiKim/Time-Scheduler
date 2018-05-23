@@ -1,3 +1,5 @@
+#include "spinlock.h"
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -41,6 +43,8 @@ struct proc {
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
   int pid;                     // Process ID
+  int tid;                     // Thread ID
+  int isThread;
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
@@ -56,6 +60,8 @@ struct proc {
   int isStride;				   // if 1, this proc is stride
   int time_allotment;		   // ticks for check whether we should drop the priority for mlfq
   int rtick_for_boost;		   // total tick proc run in one boosting cycle
+
+  struct spinlock sz_lock;
 };
 
 

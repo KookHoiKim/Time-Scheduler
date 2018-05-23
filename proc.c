@@ -31,9 +31,10 @@ ChangeContext(struct cpu* c, struct proc* p) {
 	switchuvm(p);
 	p->state = RUNNING;
 
+	// Do Context Switching
 	swtch(&(c->scheduler), p->context);
-	switchkvm();
 
+	switchkvm();
 	c->proc = 0;
 }
 
@@ -176,6 +177,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tid = 0;
+  p->isThread = 0;
 
   release(&ptable.lock);
 
@@ -210,8 +213,77 @@ found:
   return p;
 }
 
+int
+clone(thread_t *thread, void *(*start_routine)(void *), void *arg, void* stack)
+{
+  int i;
+  struct proc *np;
+  struct proc *curproc = myproc();
+  uint ustack[3];
+  void* sp;
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+ 
+  *thread = nextpid;
+  curproc->tid++;
+
+  np->isThread = 1;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  np->pgdir = curproc->pgdir;
+
+  // Allocate two pages at the next page boundary.
+  // Make the first inaccessible.  Use the second as the user stack.
+
+  ustack[0] = 0xFFFFFFFF;
+  ustack[1] = (uint)arg;
+
+  sp = stack + PGSIZE;
+  sp -= 8;
+
+  if(copyout(np->pgdir, (uint)sp, ustack, 8) < 0)
+    goto bad;
+
+  np->tf->esp = (uint)sp;
+  np->tf->eip = (uint)start_routine;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+  safestrcpy(np->name, "thread", sizeof(curproc->name));
+
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+  cprintf("sex\n");
+  return 0;
+
+bad: 
+  panic("bad state on thread_create");
+  return -1;
+	
+}
+
+// TODO : Implement
+void
+thread_exit(void* retval);
+
+// TODO : Implement
+int
+thread_join(thread_t thread, void **retval);
+
 //PAGEBREAK: 32
-// Set up first user process.
+// Set st user process.
 void
 userinit(void)
 {
@@ -256,6 +328,7 @@ growproc(int n)
   uint sz;
   struct proc *curproc = myproc();
 
+  //acquire(&(curproc->sz_lock));
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -265,6 +338,8 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+  //release(&(curproc->sz_lock));
+
   switchuvm(curproc);
   return 0;
 }
@@ -291,6 +366,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;

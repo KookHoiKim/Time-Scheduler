@@ -26,3 +26,6 @@
 #define SYS_alarm			25
 #define SYS_yield			26
 #define SYS_getlev			27
+#define SYS_clone           28
+#define SYS_thread_exit     29
+#define SYS_thread_join     30

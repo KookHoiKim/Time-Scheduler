@@ -14,6 +14,55 @@ sys_fork(void)
 }
 
 int
+sys_clone(void)
+{
+	int n;
+	void *thread;
+	void *start_routine;
+	void *arg;
+	void *stack;
+
+	if(argint(0, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	thread = (void*) n;
+
+	if(argint(1, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	start_routine = (void*) n;
+
+
+	if(argint(2, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	arg = (void*) n;
+
+	if(argint(3, &n) < 0) {
+		cprintf("in sys_thread_create\n");
+		return -1;
+	}
+	stack = (void*) n;
+
+	return clone(thread, start_routine, arg, stack);
+}
+
+int
+sys_thread_exit(void)
+{
+	return 0;
+}
+
+int 
+sys_thread_join(void)
+{
+	return 0;
+}
+
+int
 sys_exit(void)
 {
   exit();
