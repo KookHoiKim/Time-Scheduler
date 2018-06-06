@@ -20,12 +20,8 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
-  struct proc *p;
-  
   // when child thread call execute
-  // it would be initialized by wait, not by join.
-//  if(curproc->isThread)
-//  	curproc->isThread = 0;
+
 
   begin_op();
 
@@ -106,37 +102,37 @@ exec(char *path, char **argv)
   curproc->usz = sz;
 
   // Commit to the user image.
-  acquire(&ptable.lock);
-  if(curproc->num_thread || curproc->isThread){
-  	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-  		if(p->pid == curproc->pid)
-	 		p->killed = 1;
-	}
-	curproc->killed = 0;
-  }
-  curproc->state = RUNNABLE;
-  release(&ptable.lock);
-  
+ 
 	// we allocate 63 stack memory for thread 
     // to devide stack memory space and heap space by sz
-  if((sz = allocuvm(pgdir, sz, sz + 63*2*PGSIZE)) == 0){
+/*  if((sz = allocuvm(pgdir, sz, sz + 63*2*PGSIZE)) == 0){
 	cprintf("63 stack firstly allocate error\n");
 	goto bad;
-  }
-//		clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-//  }
-//  sz = 63*2*PGSIZE + sz;
+  }*/
+
   *(curproc->sz) = sz;
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
 
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
-//  if(isThread) {
-//  	curproc->isThread = isThread;
-//	curproc->parent = mainthread;
-//  }
-  cprintf("in exec, tid is %d\n",curproc->tid);
+
+/*  if(curproc->isThread){
+   	struct proc* p;
+   	acquire(&ptable.lock);
+	for(p=ptable.proc; p < &ptable.proc[NPROC]; p++){
+		if(p->pid == curproc->pid && p!=curproc){
+			p->killed = 1;
+			if(p->state == SLEEPING)
+			 	p->state = RUNNABLE;
+		}
+	}
+	release(&ptable.lock);
+	curproc->parent->isThread = 1;
+	curproc->parent = curproc->parent->parent;
+	curproc->isThread = 0;
+  }*/
+
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;

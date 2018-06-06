@@ -136,7 +136,7 @@ racingthreadmain(void *arg)
   for (i = 0; i < 10000000; i++){
     tmp = gcnt;
     tmp++;
-   // nop();
+    nop();
     gcnt = tmp;
   }
   thread_exit((void *)(tid+1));
@@ -163,7 +163,7 @@ racingtest(void)
     return -1;
     }
   }
-  printf(1,"%d\n", gcnt);
+  printf(1,"result is %d\n", gcnt);
   return 0;
 }
 
@@ -606,8 +606,10 @@ stridetest1(void)
     exit();
   } else if (pid == 0){
     set_cpu_share(50);
+	printf(1,"pid 0 is set cpu ok\n");
   } else{
     set_cpu_share(10);
+	printf(1,"pid not 0(maybe parent)is set cpu ok\n");
   }
 
   for (i = 0; i < NUM_THREAD; i++){

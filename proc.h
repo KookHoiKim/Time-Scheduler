@@ -44,7 +44,10 @@ struct proc {
   int pid;                     // Process ID
   int tid;					   // Thread ID
   int num_thread;			   // Number of threads that process made
-  int isThread;
+  int isThread;				   // Signal that it is child thread
+  int heap_size;			   // Check the heap size that allocate to the child thread
+  int result;				   // parameter to deliver the return value to main thread
+  int total_share_for_process; // process total share of stride 
 
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall

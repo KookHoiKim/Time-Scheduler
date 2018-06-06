@@ -136,15 +136,6 @@ sys_getlev(void)
 int
 sys_thread_create(void) 
 {
-/*	thread_t * thread;
-	void (*start_routine)(void*);
-	void* arg; 
-	if(argptr(1,(char**)&thread,1) < 0) return -1;
-	if(argptr(1,(char**)&start_routine, 1) < 0) return -1;
-	if(argptr(1,(char**)&arg, 1) < 0)	return -1;
-//	cprintf("%d is syscall fnc address\n",(int)start_routine);
-	return thread_create(thread, *start_routine, arg);
-	*/
  	int n;
 	void * thread;
 	void * start_routine;

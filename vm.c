@@ -173,7 +173,10 @@ switchuvm(struct proc *p)
   // forbids I/O instructions (e.g., inb and outb) from user space
   mycpu()->ts.iomb = (ushort) 0xFFFF;
   ltr(SEG_TSS << 3);
-  lcr3(V2P(p->pgdir));  // switch to process's address space
+//  if(p->isThread)
+//  	lcr3(V2P(p->parent->pgdir));
+//  else
+    lcr3(V2P(p->pgdir));  // switch to process's address space
   popcli();
 }
 
@@ -228,7 +231,6 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
     return 0;
   if(newsz < oldsz)
     return oldsz;
-
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
     mem = kalloc();
@@ -352,10 +354,14 @@ uva2ka(pde_t *pgdir, char *uva)
   pte_t *pte;
 
   pte = walkpgdir(pgdir, uva, 0);
-  if((*pte & PTE_P) == 0)
-    return 0;
-  if((*pte & PTE_U) == 0)
-    return 0;
+  if((*pte & PTE_P) == 0){
+    cprintf("first type\n");
+   	return 0;
+  }
+  if((*pte & PTE_U) == 0){
+   	cprintf("second type\n");
+   	return 0;
+  }
   return (char*)P2V(PTE_ADDR(*pte));
 }
 

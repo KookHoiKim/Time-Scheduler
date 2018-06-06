@@ -205,10 +205,12 @@ found:
 
   p->num_thread = 0;
   p->isThread = 0;
+  p->heap_size = 0;
   // initialize proc's tick information and sh
   // first allocation, push to the MLFQ first that level 0, highest priority
   p->rtick = 0;
   p->sh = 0;
+  p->total_share_for_process = 0;
   acquire(&ptable.lock);
   push_queue(p, 0);
   ptable.isNewbieComing = 1;	// this information ensure process to run first of all
@@ -343,6 +345,10 @@ exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
+  if(curproc->isThread == 1 && curproc->parent->killed == 0) {
+  	kill(curproc->pid);
+  }
+
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
@@ -358,7 +364,7 @@ exit(void)
 
   acquire(&ptable.lock);
   // initialize the queue that process has occupied
-  if(curproc->isStride) {
+  if(curproc->isStride != 0) {
    	if(curproc->isThread)
 	 	curproc->parent->sh += curproc->sh;
 	else
@@ -371,30 +377,49 @@ exit(void)
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
-  // if main thread call exit before child thread exit
-  if(curproc->num_thread) {
-  	for(p = ptable.proc; p< &ptable.proc[NPROC]; p++) {
-		if(p->parent == curproc)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  	if(p->parent == curproc){
+		if(p->isThread ==1){
+		 	p->parent = curproc->parent;
 		 	p->killed = 1;
+		}
+		else{
+			p->parent = initproc;
+			if(p->state == ZOMBIE)
+			 	wakeup1(initproc);
+		}
+	}
+  }
+
+  // if main thread call exit before child thread exit
+/*  if(curproc->num_thread) {
+  	for(p = ptable.proc; p< &ptable.proc[NPROC]; p++) {
+		if(p->parent == curproc){	
+		 	p->killed = 1;
+			if(p->state == SLEEPING)
+			 p->state = RUNNABLE;
+		}
 	}
   }
 // if exit called by child thread
   else if(curproc->isThread){
   	if(curproc->parent){
 	 	curproc->parent->killed = 1;
+		if(curproc->parent->state == SLEEPING)
+		 	curproc->parent->state = RUNNABLE;
 	}
   }
 // Pass abandoned children to init.
   else{
   	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
    		if(p->parent == curproc){
-		 	cprintf("in exit, tid is %d\n",curproc->tid);
       		p->parent = initproc;
       		if(p->state == ZOMBIE)
         		wakeup1(initproc);
     	}
   	}
-  }
+  }*/
+
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
@@ -422,10 +447,9 @@ wait(void)
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
-		if(p->isThread)
-			kfree((char*)(p->sz));
-		else
-		 	freevm(p->pgdir);
+//		if(p->isThread)
+//			kfree((char*)(p->sz));
+		if(p->isThread != 1) freevm(p->pgdir);
 		p->sz = 0;
 		p->usz = 0;
         p->kstack = 0;
@@ -755,6 +779,7 @@ set_cpu_share(int share)
     total_share += share;
 	//cprintf("total share %d  set share %d\n",total_share, share);
 	p->sh = share;
+	p->total_share_for_process = share;
 	pop_queue(p);
 	push_stride(p);
   }
@@ -768,7 +793,8 @@ set_cpu_share(int share)
 		return -1;
 	}							
 	total_share += share;
-	p->sh = share;									// it is already in the stride scheduler, so we don't need to push.
+	p->sh = share;									// it is already in the stride scheduler, so we don't need to push.i
+	p->total_share_for_process = share;
   }
   return 0;
 }
@@ -790,46 +816,49 @@ int
 thread_create(thread_t* thread, void* (*start_routine)(void*), void* arg)
 {
 	int i;
-	int origin_sh = 0;
  	struct proc* curproc = myproc();
 	struct proc* np;
 	struct proc* p;
 	uint sz, sp, ustack[2];
-//	when allocproc, we call kalloc() for new thread's kstack
-//	then why we need ustack ? 
-//	do we just alloc in user mode for user stack and change the proc's stack pointer?
+
+	// if child thread over the process's total share if stride
+	// we don't make child process
+	if(curproc->isStride){
+		if(curproc->num_thread + 1 >= curproc->total_share_for_process){
+			cprintf("no more thread cannot be made! shortage of stride share!\n");
+			return 0;
+		}
+	}
+
 	if((np=allocproc()) == 0) return -1;
+	// pid should be same between threads in one process
 	nextpid--;
 	np->pid = curproc->pid;
+	// curproc = main thread = parent of child thread
 	curproc->num_thread ++;
+	curproc->heap_size ++;
+	// copy main thread's memory address
 	*thread = np->tid;
 	np->pgdir = curproc->pgdir;
 	np->sz = curproc->sz;
-	*(np->tf) = *(curproc->tf);
 	np->parent = curproc;
-//	cprintf("curproc has %d thread\n",curproc->num_thread);
+	// thread should have own trapframe, so just copy value.
+	*(np->tf) = *(curproc->tf);
 
-//	thread already use main thread's memory
-//	don't need to allocuvm newly
-//	just grow the memory for new user stack of thread
+	
 
 
-//	cprintf("before allocuvm sz is %d\n",sz);
-//	if((sz = allocuvm(curproc->pgdir, sz, sz+2*PGSIZE)) == 0){
-//		cprintf("fuck error first\n");
-//		goto bad;
-//	}
-	sz = curproc->usz + (uint)2*PGSIZE*(curproc->num_thread-1);
+//	allocate memory of child thread
+	sz = *curproc->sz;
 	sz = PGROUNDUP(sz);
-//	if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0){
-//	 	cprintf("over the page 4gb?\n");
-//	 	goto bad;
-//	}
-	sz = sz + (uint)2*PGSIZE;
-//	clearpteu(np->pgdir, (char*)(sz - 2*PGSIZE));
+	if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0){
+	 	cprintf("over the page 4gb?\n");
+	 	goto bad;
+	}
+	clearpteu(np->pgdir, (char*)(sz - 2*PGSIZE));
 	sp = sz;
 	np->usz = sz;
-//	cprintf("sp is %d\n",sp);
+	*curproc->sz = sz;
 	
 	ustack[0] = 0xffffffff;  // fake return PC
   	ustack[1] = (uint)arg;
@@ -851,34 +880,28 @@ thread_create(thread_t* thread, void* (*start_routine)(void*), void* arg)
 	np->cwd = idup(curproc->cwd);
 
 	safestrcpy(np->name, curproc->name, sizeof(curproc->name));
-	
+
 	// Scheduling part	
 
 	// if main thread is stride
 	// we need to devide the share
+	// the remainder gives to main thread
 	if(curproc->isStride) {
 	 	acquire(&ptable.lock);
 		np->isStride = 1;
 
-		if(np->parent->num_thread > 1) {
-			for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-				if(p->parent == curproc){
-					origin_sh = (p->sh)*(curproc->num_thread-1) + curproc->sh;
-					p->sh = origin_sh/(curproc->num_thread);
-				}
-			}
-			np->sh = origin_sh/(curproc->num_thread);
-			curproc->sh = np->sh + origin_sh%2;
-			np->state = RUNNABLE;
+		for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+			if(p->parent == curproc)
+				p->sh = curproc->total_share_for_process/(curproc->num_thread + 1);
+			
 		}
-		else{
-			np->sh = (curproc->sh)/2;
-			curproc->sh = np->sh + (curproc->sh)%2;
-			np->state = RUNNABLE;
-		}
+		curproc->sh = curproc->total_share_for_process/(curproc->num_thread + 1) + (curproc->total_share_for_process)%(curproc->num_thread + 1);
+		np->state = RUNNABLE;
+		
 		pop_queue(np);
 		push_stride(np);
 		release(&ptable.lock);
+		cprintf("thread create! share of thread is %d\n",np->sh);	
 		return 0;
 	}
 	// if main thread is mlfq, we just run it
@@ -918,31 +941,33 @@ thread_join(thread_t thread, void** retval)
 		  // child thread change to main thread
 		  // for example, by exec.
 		  // then this thread will be initialized by wait.
-		  if(p->isThread == 0){
+		 /* if(p->isThread == 0){
 		   	cprintf("exec test fuck\n");
 			release(&ptable.lock);
 			return 0;
-		  }
+		  }*/
 		   	
 		  havekids = 1;
 		  if(p->state == ZOMBIE){
 			// Found one.
 		   	*retval =(void*)p->result;
-			//if(!deallocuvm(p->pgdir, p->usz, p->usz - 2*PGSIZE))
-			//	panic("dealloc fail!\n");
 			kfree(p->kstack);
 			p->kstack = 0;
 			//freevm(p->pgdir);
-			p->pgdir = 0;
-			p->sz = 0;
-			p->usz = 0;
 			p->pid = 0;
 			p->tid = 0;
+			if(deallocuvm(p->pgdir, p->usz, p->usz - 2*PGSIZE) == 0)
+				panic("dealloc fail!\n");
 			curproc->num_thread --;
-//			if(curproc->num_thread == 0)
-//				*(curproc->sz) = curproc->usz;
+			if(curproc->num_thread == 0){
+				*p->sz -= 2*PGSIZE*p->parent->heap_size;
+				p->parent->heap_size = 0;
+			}
 			// thread return share to main thread when thread_exit
 			// things about scheduling already initialized in exit
+			p->pgdir = 0;
+			p->usz = 0;
+			p->sz = 0;
 			p->parent = 0;
 			p->name[0] = 0;
 			p->killed = 0;
@@ -965,7 +990,6 @@ void
 thread_exit(void *retval)
 {
   struct proc *curproc = myproc();
-//  struct proc *p;
   int fd;
 
   if(curproc == initproc)
@@ -1004,16 +1028,7 @@ thread_exit(void *retval)
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
-  // Pass abandoned children to init.
-/*  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
-    }
-  }*/
 
-//  cprintf("is it fucking exit is progressing\n");
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();

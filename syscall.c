@@ -37,7 +37,7 @@ fetchstr(uint addr, char **pp)
   if(addr >= *(curproc->sz))
     return -1;
   *pp = (char*)addr;
-  ep = (char*)((*curproc->sz));  
+  ep = (char*)(*curproc->sz);  
   for(s = *pp; s < ep; s++){
     if(*s == 0)
       return s - *pp;
