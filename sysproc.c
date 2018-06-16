@@ -180,3 +180,38 @@ sys_thread_exit(void)
 	return 0; // not reached
 }
 
+// syscall pread, pwrite
+/*int
+sys_pread(void)
+{
+	struct file *f;
+	int n, off;
+	char *p;
+
+	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || argint(3, &off) < 0)
+	    return -1;
+
+	if(off > f->ip->size) return -1;
+
+	f->off = off;
+
+	return fileread(f, p, n);
+}
+
+int
+sys_pwrite(void)
+{
+  struct file *f;
+  int n, off;
+  char *p;
+
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || argint(3, &off) < 0)
+  	return -1;
+
+  if(off > f->ip->size) return -1;
+
+  f->off = off;
+
+  return filewrite(f, p, n);
+
+}*/

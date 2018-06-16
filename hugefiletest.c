@@ -31,7 +31,7 @@ main(int argc, char *argv[])
         if (i % 100 == 0){
             printf(1, "%d bytes written\n", i * BUFSIZE);
         }
-        if ((r = write(fd, data, sizeof(data))) != sizeof(data)){
+        if ((r = pwrite(fd, data, sizeof(data),i * BUFSIZE)) != sizeof(data)){
             printf(1, "write returned %d : failed\n", r);
             exit();
         }
@@ -45,7 +45,7 @@ main(int argc, char *argv[])
         if (i % 100 == 0){
             printf(1, "%d bytes read\n", i * BUFSIZE);
         }
-        if ((r = read(fd, buf, sizeof(data))) != sizeof(data)){
+        if ((r = pread(fd, buf, sizeof(data),i*BUFSIZE)) != sizeof(data)){
             printf(1, "read returned %d : failed\n", r);
             exit();
         }
@@ -73,7 +73,7 @@ main(int argc, char *argv[])
             if (j % 100 == 0){
                 printf(1, "%d bytes totally written\n", total);
             }
-            if ((r = write(fd, data, sizeof(data))) != sizeof(data)){
+            if ((r = pwrite(fd, data, sizeof(data),j*BUFSIZE)) != sizeof(data)){
                 printf(1, "write returned %d : failed\n", r);
                 exit();
             }

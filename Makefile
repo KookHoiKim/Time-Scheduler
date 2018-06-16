@@ -181,6 +181,7 @@ UPROGS=\
 	_test_stride\
 	_threadtest\
 	_hugefiletest\
+	_pwritetest\
 
 fs.img: mkfs README $(UPROGS)
 		./mkfs fs.img README $(UPROGS)

@@ -32,6 +32,8 @@ int getlev(void);
 int thread_create(int*, void*, void*);
 int thread_join(int, void**);
 int thread_exit(void*) __attribute__((noreturn));
+int pread(int,void*,int,int);
+int pwrite(int,void*,int,int);
 
 
 // ulib.c

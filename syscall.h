@@ -29,3 +29,5 @@
 #define SYS_thread_create	28
 #define SYS_thread_join		29
 #define SYS_thread_exit		30
+#define SYS_pread			31
+#define SYS_pwrite			32
